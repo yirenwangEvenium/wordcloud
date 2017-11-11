@@ -1,423 +1,202 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from copy import copy
-from math import sin, cos, ceil
-from pygame import transform, font, mask, Surface, Rect, SRCALPHA, draw
-from pygame.sprite import Group, Sprite, collide_mask
-from random import randint, choice
-import colorsys
-import math
-import os
-import pygame
-import simplejson
+
+import spacy
+import numpy as np
+from sklearn.cluster import AffinityPropagation
 
 
-TAG_PADDING = 5
-TAG_CLOUD_PADDING = 5 # Margins added to the whole image
-STEP_SIZE = 2 # relative to base step size of each spiral function
-RADIUS = 1
-ECCENTRICITY = 1.5
-
-LOWER_START = 0.45
-UPPER_START = 0.55
-
-FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts')
-DEFAULT_FONT = 'Droid Sans'
-DEFAULT_PALETTE = 'default'
-FONT_CACHE = simplejson.load(open(os.path.join(FONT_DIR, 'fonts.json'), 'r'))
-
-pygame.init()
-convsurf = Surface((2 * TAG_PADDING, 2 * TAG_PADDING))
-convsurf.fill((255, 0, 255))
-convsurf.set_colorkey((255, 0, 255))
-draw.circle(convsurf, (0, 0, 0), (TAG_PADDING, TAG_PADDING), TAG_PADDING)
-CONVMASK = mask.from_surface(convsurf)
-
-LAYOUT_HORIZONTAL = 0
-LAYOUT_VERTICAL = 1
-LAYOUT_MOST_HORIZONTAL = 2
-LAYOUT_MOST_VERTICAL = 3
-LAYOUT_MIX = 4
-
-LAYOUTS = (
-           LAYOUT_HORIZONTAL,
-           LAYOUT_VERTICAL,
-           LAYOUT_MOST_HORIZONTAL,
-           LAYOUT_MOST_VERTICAL,
-           LAYOUT_MIX
-           )
-
-LAST_COLLISON_HIT = None
-
-FONTS = {}
-
-def get_font(font, size):
-    name = font['ttf']
-    if (name, size) not in FONTS:
-        FONTS[name, size] = pygame.font.Font(os.path.join(FONT_DIR, name), size)
-    return FONTS[name, size]
-
-class Tag(Sprite):
+def stop_word_stripper(line):
     """
-    Font tag sprite. Blit the font to a surface to correct the font padding
+    docstring here
+        :param line: nlp object of spacy
+        :return: string without stopwords nor punctuation nor symbols
     """
-    def __init__(self, tag, initial_position, fontname=DEFAULT_FONT):
-        Sprite.__init__(self)
-        self.tag = copy(tag)
-        self.rotation = 0
-        
-        self.font_spec = load_font(fontname)
-        self.font = get_font(self.font_spec, self.tag['size'])
-        fonter = self.font.render(tag['tag'], True, tag['color'])
-        frect = fonter.get_bounding_rect()
-        frect.x = -frect.x
-        frect.y = -frect.y
-        self.fontoffset = (-frect.x, -frect.y)
-        font_sf = Surface((frect.width, frect.height), pygame.SRCALPHA, 32)
-        font_sf.blit(fonter, frect)
-        self.image = font_sf
-        self.rect = font_sf.get_rect()
-        self.rect.width += TAG_PADDING
-        self.rect.height += TAG_PADDING
-        self.rect.x = initial_position[0]
-        self.rect.y = initial_position[1]
-        self._update_mask()
+    stop_words = [w.strip('\n').lower() for w in open('stop_words.txt').readlines()]
+    pos_stopper = ['PUNCT', 'SYM']
 
-    def _update_mask(self):
-        self.mask = mask.from_surface(self.image)
-        self.mask = self.mask.convolve(CONVMASK, None, (TAG_PADDING, TAG_PADDING))
+    return ' '.join([token.text for token in line if str(token).lower() not in stop_words and token.pos_  not in pos_stopper])
 
-    def flip(self):
-        angle = 90 if self.rotation == 0 else - 90
-        self.rotate(angle)
+'''
+PRE-PROCESSING
+'''
+def pre_processing():
+    # load nlp
+    nlp = spacy.load('en_core_web_md')
 
-    def rotate(self, angle):
-        pos = (self.rect.x, self.rect.y)
-        self.image = transform.rotate(self.image, angle)
-        self.rect = self.image.get_rect()
-        self.rect.x, self.rect.y = pos
-        self._update_mask()
-
-    def update_fontsize(self):
-        self.font = get_font(self.font_spec, self.tag['size'])
-        
-def load_font(name):
-    for font in FONT_CACHE:
-        if font['name'] == name:
-            return font
-    raise AttributeError('Invalid font name. Should be one of %s' % 
-                         ", ".join([f['name'] for f in FONT_CACHE]))
-
-def defscale(count, mincount, maxcount, minsize, maxsize):
-    if maxcount == mincount:
-        return int((maxsize - minsize) / 2.0 + minsize)
-    return int(minsize + (maxsize - minsize) * 
-               (count * 1.0 / (maxcount - mincount)) ** 0.8)
-
-def make_tags(wordcounts, minsize=3, maxsize=36, colors=None, scalef=defscale):
-    """
-    sizes and colors tags 
-    wordcounts is a list of tuples(tags, count). (e.g. how often the
-    word appears in a text)
-    the tags are assigned sizes between minsize and maxsize, the function used
-    is determined by scalef (default: square root)
-    color is either chosen from colors (list of rgb tuples) if provided or random
-    """
-    counts = [tag[1] for tag in wordcounts]
-
-    if not len(counts):
-        return []
-
-    maxcount = max(counts)
-    mincount = min(counts)
-    tags = []
-    for word_count in wordcounts:
-        color = choice(colors) if colors else (randint(10, 220), randint(10, 220),
-                                               randint(10, 220))
-        tags.append({'color': color, 'size': scalef(word_count[1], mincount,
-                                                    maxcount, minsize, maxsize),
-                     'tag': word_count[0]})
-    return tags
-
-def _do_collide(sprite, group):
-    """
-    Use mask based collision detection
-    """
-    global LAST_COLLISON_HIT
-    # Test if we still collide with the last hit
-    if LAST_COLLISON_HIT and collide_mask(sprite, LAST_COLLISON_HIT):
-        return True
+    # load text data
+    docs = [x.strip('\n') for x in open('answers.txt').readlines()]
     
-    for sp in group:
-        if collide_mask(sprite, sp):
-            LAST_COLLISON_HIT = sp
-            return True
-    return False
-
-def _get_tags_bounding(tag_store):
-    if not len(tag_store):
-        return Rect(0,0,0,0)
-    rects = [tag.rect for tag in tag_store]
-    return rects[0].unionall(rects[1:])
-
-def _get_group_bounding(tag_store, sizeRect):
-    if not isinstance(sizeRect, pygame.Rect):
-        sizeRect = Rect(0, 0, sizeRect[0], sizeRect[1])
-    if tag_store:
-        rects = [tag.rect for tag in tag_store]
-        union = rects[0].unionall(rects[1:])
-        if sizeRect.contains(union):
-            return union
-    return sizeRect
-
-def _archimedean_spiral(reverse):
-    DEFAULT_STEP = 0.05 # radians
-    t = 0
-    r = 1
-    if reverse:
-        r = -1
-    while True:
-        t += DEFAULT_STEP * STEP_SIZE * r
-        yield (ECCENTRICITY * RADIUS * t * cos(t), RADIUS * t * sin(t))
-
-def _rectangular_spiral(reverse):
-    DEFAULT_STEP = 3 # px
-    directions = [(1, 0), (0, 1), (-1, 0), (0, -1)]
-    if reverse:
-        directions.reverse()
-    direction = directions[0]
-
-    spl = 1
-    dx = dy = 0
-    while True:
-        for step in range(spl * 2):
-            if step == spl:
-                direction = directions[(spl - 1) % 4]
-            dx += direction[0] * STEP_SIZE * DEFAULT_STEP
-            dy += direction[1] * STEP_SIZE * DEFAULT_STEP
-            yield dx, dy
-        spl += 1
-
-def _search_place(current_tag, tag_store, canvas, spiral, ratio):
-    """
-    Start a spiral search with random direction.
-    Resize the canvas if the spiral exceeds the bounding rectangle
-    """
-
-    reverse = choice((0, 1))
-    start_x = current_tag.rect.x
-    start_y = current_tag.rect.y
-    min_dist = None
-    opt_x = opt_y = 0
+    # Strip stop words and create a copy
+    stripped_docs = [] #spacy object
+    copy_docs = [] # strings
+    for d in docs:
+        stripped_docs.append(nlp(stop_word_stripper(nlp(d))))
+        copy_docs.append(stop_word_stripper(nlp(d)))
     
-    current_bounding = _get_tags_bounding(tag_store)
-    cx = current_bounding.w / 2.0
-    cy = current_bounding.h / 2.0
+    # parse through to get entities 
+    kw_freq = {}
 
-    for dx, dy in spiral(reverse):
-        current_tag.rect.x = start_x + dx
-        current_tag.rect.y = start_y + dy
-        if not _do_collide(current_tag, tag_store):
-            if canvas.contains(current_tag.rect):
-                tag_store.add(current_tag)
-                return
+    for i in range(len(stripped_docs)):
+        line = stripped_docs[i]
+        for e in line.ents:
+            copy_docs[i] = copy_docs[i].replace(e.text, '').strip()
+            if e.text in kw_freq:
+                kw_freq[e.text] += 1
             else:
-                # get the distance from center
-                current_dist = (abs(cx - current_tag.rect.x) ** 2 + 
-                                abs(cy - current_tag.rect.y) ** 2) ** 0.5
-                if not min_dist or current_dist < min_dist:
-                    opt_x = current_tag.rect.x
-                    opt_y = current_tag.rect.y 
-                    min_dist = current_dist
+                kw_freq[e.text] = 1
 
-                # only add tag if the spiral covered the canvas boundaries
-                if abs(dx) > canvas.width / 2.0 and abs(dy) > canvas.height / 2.0:
-                    current_tag.rect.x = opt_x                    
-                    current_tag.rect.y = opt_y                    
-                    tag_store.add(current_tag)
+    # get lemma keywords 
+    # join the rest of the words together: 
 
-                    new_bounding = current_bounding.union(current_tag.rect)
+    corpus = nlp(' '.join(copy_docs))
 
-                    delta_x = delta_y = 0.0
-                    if new_bounding.w > canvas.width:
-                        delta_x = new_bounding.w - canvas.width
+    MIN_CHARACTERS = 3
 
-                        canvas.width = new_bounding.w
-                        delta_y = ratio * new_bounding.w - canvas.height
-                        canvas.height = ratio * new_bounding.w
+for token in corpus:
+    if len(token.lemma_) > MIN_CHARACTERS:
+        if token.lemma_ in kw_freq:
+            kw_freq[token.lemma_] += 1
+        else:
+            kw_freq[token.lemma_] = 1
 
-                    if new_bounding.h > canvas.height:
-                        delta_y = new_bounding.h - canvas.height
+print(kw_freq)
 
-                        canvas.height = new_bounding.h
-                        canvas.width = new_bounding.h / ratio
-                        delta_x = canvas.width - canvas.width
+# spellcheck keywords: 
+from hunspell import Hunspell
+h = Hunspell();
+spell_checked_kw_freq = {}
+for kw, freq in kw_freq.items():
+    if freq == 1:
+        found = False
+        c_kws = h.suggest(kw) 
+        for c in c_kws:
+            if c in kw_freq:
+                spell_checked_kw_freq[c] = kw_freq[c] + 1
+                found = True
+                break
+        if not found:
+            spell_checked_kw_freq[c_kws[0]] = 1
+print(spell_checked_kw_freq) 
 
-                    # realign
-                    for tag in tag_store:
-                        tag.rect.x += delta_x / 2.0
-                        tag.rect.y += delta_y / 2.0
+# proper casing
 
+caseless_freq = {}
+propercase_freq = {}
 
-                    canvas = _get_tags_bounding(tag_store)
-
-                    return
-
-def _draw_cloud(
-        tag_list,
-        layout=LAYOUT_MIX,
-        size=(500,500),
-        fontname=DEFAULT_FONT,
-        rectangular=False):
-
-    # sort the tags by size and word length
-    tag_list.sort(key=lambda tag: len(tag['tag']))
-    tag_list.sort(key=lambda tag: tag['size'])
-    tag_list.reverse()
-
-    # create the tag space
-    tag_sprites = []
-    area = 0
-    for tag in tag_list:
-        tag_sprite = Tag(tag, (0, 0), fontname=fontname)
-        area += tag_sprite.mask.count()
-        tag_sprites.append(tag_sprite)
-
-    canvas = Rect(0, 0, 0, 0)
-    ratio = float(size[1]) / size[0]
-
-    if rectangular:
-        spiral = _rectangular_spiral
+for kw, count in kw_freq.items():
+    if kw in caseless_freq:
+        caseless_freq[kw.lower()].append(count)
     else:
-        spiral = _archimedean_spiral
+        caseless_freq[kw.lower()] = [count]
 
-    aligned_tags = Group()
-    for tag_sprite in tag_sprites:
-        angle = 0
-        if layout == LAYOUT_MIX and randint(0, 2) == 0:
-            angle = 90
-        elif layout == LAYOUT_VERTICAL:
-            angle = 90
+for kw, count in kw_freq.items():
+    if count == max(caseless_freq[kw.lower()]):
+        propercase_freq[kw] = sum(caseless_freq[kw.lower()])
 
-        tag_sprite.rotate(angle)
+print(propercase_freq)
+        
 
-        xpos = canvas.width - tag_sprite.rect.width
-        if xpos < 0: xpos = 0
-        xpos = randint(int(xpos * LOWER_START) , int(xpos * UPPER_START))
-        tag_sprite.rect.x = xpos
+# semantic k means clustering
 
-        ypos = canvas.height - tag_sprite.rect.height
-        if ypos < 0: ypos = 0
-        ypos = randint(int(ypos * LOWER_START), int(ypos * UPPER_START))
-        tag_sprite.rect.y = ypos
+glove_vectors = []
+labels_array = []
 
-        _search_place(tag_sprite, aligned_tags, canvas, spiral, ratio)
-    canvas = _get_tags_bounding(aligned_tags)
+for kw, count in propercase_freq.items():
+    labels_array.append(kw)
+    glove_vectors.append(nlp(kw)[0].vector)
 
-    # resize cloud
-    zoom = min(float(size[0]) / canvas.w, float(size[1]) / canvas.h)
+print(np.array(glove_vectors).shape, labels_array)
+
+
+# AffinityPropagation clustering 
+
+AffinityPropagation_model = AffinityPropagation()
+AffinityPropagation_model.fit(glove_vectors)
+
+cluster_labels    = AffinityPropagation_model.labels_
+
+clusters = {}
+kw_cluster = {}
+for i in range(len(labels_array)):
+    if cluster_labels[i] not in clusters:
+        clusters[cluster_labels[i]] = [labels_array[i]]
+    else:
+        clusters[cluster_labels[i]].append(labels_array[i])
+    kw_cluster[labels_array[i]] = cluster_labels[i]
+
+print (kw_cluster)
+
+
+#distance matrix (len(cluster_labels)^2)
+
+from scipy import spatial
+
+n = len(labels_array)
+
+distance_matrix = np.zeros([n, n])
+
+for i in range(n):
+    for j in range(n):
+        distance_matrix[i][j] = spatial.distance.cosine(glove_vectors[i], glove_vectors[j])
+
+
+# assign max font size
+
+def assign_font_size(propercase_freq, max_size, min_size):
+    label_fs = {}
+    sorted_tuples = [(k, propercase_freq[k]) for k in sorted(propercase_freq, key=propercase_freq.get, reverse=True)]
+    min_count = sorted_tuples[-1][1]
+    max_count = sorted_tuples[0][1]
     
-    for tag in aligned_tags:
-        tag.rect.x *= zoom
-        tag.rect.y *= zoom
-        tag.rect.width *= zoom
-        tag.rect.height *= zoom
-        tag.tag['size'] = int(tag.tag['size'] * zoom)
-        tag.update_fontsize() 
+    for kw, count in sorted_tuples:
+        if (max_count - min_count) == 0:
+            size = int((max_size - min_size) / 2.0 + min_size)
+        else:
+            #size = int(min_size + (max_size - min_size) * (count * 1.0 / (max_count - min_count)) ** 0.8)
+            size = int((max_size - min_size)/(max_count - min_count)*count + min_size - (max_size - min_size)/(max_count - min_count)*min_count)
+        label_fs[kw] = size
+    
+    return (label_fs)
+        
+kw_fs = assign_font_size(propercase_freq, 80, 30) #keyword_font_size
+print(kw_fs)
 
-    canvas = _get_tags_bounding(aligned_tags)
 
-    return canvas, aligned_tags
+def max_dimensions(kw_fs):
+    kw_dimensions = {}
+    for kw, fs in kw_fs.items():
+        kw_dimensions[kw] = (int(0.7*len(kw)*fs), fs) #x, y (i.e. width, height)
+    return kw_dimensions
 
-def create_tag_image(
-        tags, 
-        output, 
-        size=(500,500), 
-        background=(255, 255, 255), 
-        layout=LAYOUT_MIX, 
-        fontname=DEFAULT_FONT,
-        rectangular=False):
-    """
-    Create a png tag cloud image
-    """
+kw_max_dim = max_dimensions(kw_fs)
+print(kw_max_dim)
 
-    if not len(tags):
-        return
 
-    sizeRect, tag_store = _draw_cloud(tags,
-                                      layout,
-                                      size=size, 
-                                      fontname=fontname,
-                                      rectangular=rectangular)
 
-    if type(output) == pygame.Surface:
-        image_surface = output
-    else:
-        image_surface = Surface((sizeRect.w + 2*TAG_CLOUD_PADDING, sizeRect.h + 2*TAG_CLOUD_PADDING), SRCALPHA, 32)
-        image_surface.fill(background)
-    for tag in tag_store:
-        image_surface.blit(tag.image, (tag.rect.x - sizeRect.x + TAG_CLOUD_PADDING, tag.rect.y - sizeRect.y + TAG_CLOUD_PADDING))
-    pygame.image.save(image_surface, output)
+words = []
+for kw, d in kw_max_dim.items():
+    words.append(Word(kw, {"width": d[0], "height": d[1]}, kw_fs[kw], kw_cluster[kw]))
 
-def create_html_data(tags, 
-        size=(500,500), 
-        layout=LAYOUT_MIX, 
-        fontname=DEFAULT_FONT,
-        rectangular=False):
-    """
-    Create data structures to be used for HTML tag clouds.
-    """
+cloud = Cloud(words=words)
 
-    if not len(tags):
-        return
+cloud.create_cloud_svg()
 
-    sizeRect, tag_store = _draw_cloud(tags,
-                                      layout,
-                                      size=size, 
-                                      fontname=fontname,
-                                      rectangular=rectangular)
+#cloud.compress()
 
-    tag_store = sorted(tag_store, key=lambda tag: tag.tag['size'])
-    tag_store.reverse()
-    data = {
-            'css': {},
-            'links': []
-            }
+#print(cloud.canvas)
+'''
+import matplotlib.pyplot as plt
 
-    color_map = {}
-    for color_index, tag in enumerate(tags):
-        if not color_map.has_key(tag['color']):
-            color_name = "c%d" % color_index
-            hslcolor = colorsys.rgb_to_hls(tag['color'][0] / 255.0, 
-                                           tag['color'][1] / 255.0, 
-                                           tag['color'][2] / 255.0)
-            lighter = hslcolor[1] * 1.4
-            if lighter > 1: lighter = 1
-            light = colorsys.hls_to_rgb(hslcolor[0], lighter, hslcolor[2])
-            data['css'][color_name] = ('#%02x%02x%02x' % tag['color'], 
-                                       '#%02x%02x%02x' % (light[0] * 255,
-                                                          light[1] * 255,
-                                                          light[2] * 255))
-            color_map[tag['color']] = color_name
+fig = plt.figure(figsize=(10,10))
 
-    for stag in tag_store:
-        line_offset = 0
+ax = fig.add_subplot(111)
+fig.subplots_adjust(top=0.85)
 
-        line_offset = stag.font.get_linesize() - (stag.font.get_ascent() + \
-                                                  abs(stag.font.get_descent()) - \
-                                                  stag.rect.height) - 4
+for w in cloud.canvas:
+    ax.text(w["x"], w["y"], w["word"], fontsize=w["font_size"]//3)
 
-        tag = {
-               'tag': stag.tag['tag'],
-               'cls': color_map[stag.tag['color']],
-               'top': stag.rect.y - sizeRect.y,
-               'left': stag.rect.x - sizeRect.x,
-               'size': int(stag.tag['size'] * 0.85),
-               'height': int(stag.rect.height * 1.19) + 4,
-               'width': stag.rect.width,
-               'lh': line_offset
-               }
+ax.axis([0, 1920, 0, 1080])
 
-        data['links'].append(tag)
-        data['size'] = (sizeRect.w, sizeRect.h * 1.15)
-
-    return data
+'''
+#plt.show()

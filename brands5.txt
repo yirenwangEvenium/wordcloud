@@ -1,0 +1,24 @@
+Shoretel
+Star to Star
+Digium
+None
+Avaya
+Intermedia
+Switchvox
+Shoretel 
+Digium 
+None
+None
+
+Shoretel
+"Panasonic
+SkyTalk
+Pulsar360"
+None
+White box with SIP
+Cisco, Avaya
+Star 2 Star
+Star2Star
+Digium
+Intermedia
+3CX
