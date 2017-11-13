@@ -33,6 +33,7 @@ def assign_font_size(propercase_freq, max_size, min_size):
             size = int((max_size - min_size)/(max_count - min_count)*count + min_size - (max_size - min_size)/(max_count - min_count)*min_count)
         label_fs[kw] = size
 
+    # return sorted label_fs in decreasing order of font_size
     return label_fs
 
 
@@ -144,5 +145,3 @@ def pre_processing(filename):
         words.append(Word(kw, {"width": d[0], "height": d[1]}, kw_fs[kw], kw_cluster[kw]))
 
     return words
-
-print(pre_processing('real1.txt'))

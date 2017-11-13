@@ -20,6 +20,9 @@ class Cloud:
                 clusters[w.cluster].append(w)
             else:
                 clusters[w.cluster] = [w]
+        
+        for c, words in clusters.items():
+            print( [w.word for w in words])
         return clusters
     
     '''
@@ -194,7 +197,7 @@ class Cloud:
         ys = [c["y"] for c in self.canvas]
         
         x_min = min(xs)
-        x_max = max(xs) # ! not real max, real max need word width
+        x_max = max(xs) + self.canvas[xs.index(max(xs))]["width"]
         
         y_min = min(ys)
         y_max = max(ys)
