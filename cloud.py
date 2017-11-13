@@ -1,9 +1,7 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 import random
 from math import cos
 from math import sin
+
 
 class Cloud:
     def __init__(self, words=[], canvas_size={"x": 1920, "y": 1080}, filename='clouds.html'):
@@ -12,7 +10,7 @@ class Cloud:
         self.canvas_size = canvas_size
         self.clusters = self.generate_clusters() # {0 : cluster0, 1 : cluster1, ...etc}
         self.filename = filename
-        self.colors = ["#5F0B2B","#D11638", "#F08801", "#FACE00", "#ADA20B", "#D4D639", "#EF6D3E", "#90A6BF", "#F2AEB4", "#AA61AE", "#FBC6CE"]
+        self.colors = ["#6F694E", "#65D0B2", "#D8F546", "#FF724B", "#D6523E", "#B3F0E6", "#EAF380", "#A7328E", "#33DB45", "#EAEA45", "#63FFF3", "#7488AC", "#C0F8E1"]
         self.positions = []
         
     def generate_clusters(self):
@@ -23,66 +21,119 @@ class Cloud:
             else:
                 clusters[w.cluster] = [w]
         return clusters
+    
+    '''
+    def choose_cluster_start(self):
+        start_points = {}
+        start_point = {}
+        r = 0
+        for i in range(len(self.clusters)):
+            c = self.clusters[i]
+            n = len(c)
+            
+            H = self.canvas_size["y"] #total height
+            L = self.canvas_size["x"] #total length
+            
+            if i%2 == 0:
+                y = random.randint(int(0.1*H), int(0.55*H))
+            else:
+                y = random.randint(int(0.55*H), int(0.9*H))
+            x = random.randint(int(r*L), min(int((r+len(c)/len(self.words))*L), int(L*0.90)))
+            
+            r = min(0.85, r + len(c)/len(self.words))
+            start_points[c[0].cluster] = {
+                "x": x,
+                "y": y
+            }
+        return start_points
+    '''
         
-    def create_cloud_svg(self):
+    def create_cloud(self):
+        
+        # sort by cluster size
+        # sort by max font-size
         cl_size = {}
         for c, words in self.clusters.items():
-            cl_size[c] = len(words)
+            if len(words) < 4:
+                avg_size = sum([w.font_size for w in words])//len(words)
+            else:
+                avg_size = sum(sorted([w.font_size for w in words])[::-1][:4])/4
+            cl_size[c] = avg_size*3 - len(words)
         sorted_clusters = sorted(cl_size, key=cl_size.get)[::-1]
         
-        start_position = { "x": 1920//2, "y": 1080//3 }
+        start_position = { "x": self.canvas_size["x"]//2, "y": self.canvas_size["y"]//2 }
         
-        for c in sorted_clusters:
+        for i in range(len(sorted_clusters)):
+            c = sorted_clusters[i]
             words = self.clusters[c]
             self.positions = self.spiral(start_position)
+            
             for w in words:
                 new_position = self.add_word_to_cloud(w) 
-                
-            start_position = new_position
             
+            max_left_cloud = min([c["x"] for c in self.canvas])
+            max_right_cloud = max([c["x"] for c in self.canvas])
+            shift = 30
+            if i%2 == 0:
+                if new_position["x"] < self.canvas_size["x"]//2: 
+                    start_position = { "x" : min(self.canvas_size["x"]//2 + new_position["x"], max_right_cloud + shift), "y": new_position["y"] }
+                if new_position["x"] > self.canvas_size["x"]//2: 
+                 start_position = { "x" : max(self.canvas_size["x"] - new_position["x"], max_left_cloud - shift), "y": new_position["y"] }
+            else:
+                start_position = new_position
+        
+        self.center_cloud()
+        
+    def draw_cloud_to_svg(self):
         f = open(self.filename, 'w')
-        f.write('<svg viewbox="0 0 1920 1080">')
+        f.write('<svg viewbox="0 0 {} {}" style="background: black">'.format(self.canvas_size["x"], self.canvas_size["y"]))
         for w in self.canvas:
-            f.write('<text x="{}" y="{}" font-family="Verdana" font-size="{}" stroke="none" fill="{}">'.format(w["x"], w["y"], w["font_size"], w["color"]))
+           
+
+            #f.write(' <rect x="{}" y="{}" width="{}" height="{}"/>'.format( w["x"], w["y"], w["width"], w["height"]))
+            f.write('<text x="{}" y="{}" font-family="Verdana" font-size="{}" fill="{}">'.format(w["x"], w["y"], w["font_size"], w["color"]))
             f.write(w["word"])
             f.write('</text>\n')
         f.write('</svg>')
         f.close()
-
-
-    def add_word_to_cloud(self, word): # word class Word        
-        """
-        docstring here
-            :param word: Class Word
-            :return:
-        """
+        
+        
+    def add_word_to_cloud(self, word): # word class Word
+        center = {"x": self.canvas_size["x"] // 2, "y": self.canvas_size["y"] // 2}
         for p in self.positions:
-            if self.verify_overlap( word, p):
-                self.positions.remove(p)
+            if p["x"] < center["x"]:
+                if not self.verify_overlap( word, {"x": p["x"] - word.width, "y": p["y"]} ):
+                    self.canvas.append({
+                        "word": word.word,
+                        "x": p["x"] - word.width,
+                        "y": p["y"],
+                        "width": word.width,
+                        "height": word.height,
+                        "font_size": word.font_size,
+                        "color": self.colors[word.cluster],
+                        "cluster": word.cluster
+                    })
+                    self.positions.remove(p)
+                    return p
             else:
-                self.canvas.append({
-                    "word": word.word,
-                    "x": p["x"],
-                    "y": p["y"],
-                    "width": word.width,
-                    "height": word.height,
-                    "font_size": word.font_size,
-                    "color": self.colors[word.cluster],
-                    "cluster": word.cluster
-                })
-                self.positions.remove(p)
-                return p
+                if not self.verify_overlap( word, {"x": p["x"], "y": p["y"]} ):
+                    self.canvas.append({
+                        "word": word.word,
+                        "x": p["x"],
+                        "y": p["y"],
+                        "width": word.width,
+                        "height": word.height,
+                        "font_size": word.font_size,
+                        "color": self.colors[word.cluster],
+                        "cluster": word.cluster
+                    })
+                    self.positions.remove(p)
+                    return p
 
+        return self.positions[-1]
+            
 
     def rect_intersection(self, r1, r2):
-        # you need x,y width height for each rectangle (word)
-        # r1 x, y, width, height
-        # p1--------
-        #  |        |
-        #  |        |
-        # (x,y)-----p2
-
-
         p1 = {}
         p1["x"] = r1["x"]
         p1["y"] = r1["y"] - r1["height"]
@@ -113,7 +164,7 @@ class Cloud:
             if self.rect_intersection(filled_rect, new_rect):
                 return True
         #verify out of bound of rectangle:
-        if new_rect["x"] < 0 or new_rect["x"] + new_rect["width"] > 1920 or new_rect["y"] > 1080 or new_rect["y"]- new_rect["height"] < 0:
+        if new_rect["x"] < 0 or new_rect["x"] + new_rect["width"] > self.canvas_size["x"] or new_rect["y"] > 1080 or new_rect["y"]- new_rect["height"] < 0:
             return True
         return False
     
@@ -128,7 +179,7 @@ class Cloud:
         # a_final = self.canvas_size["x"]*len(self.clusters[cluster])/len(self.words) #spiral radius 
         a_final = self.canvas_size["x"] #spiral radius 
 
-        b = (a_final - a_ini)/(2*3.14159*(self.canvas_size["y"]/10))
+        b = (a_final - a_ini)/(2*3.14159*(self.canvas_size["x"]/10))
 
         thetas = [ (self.canvas_size["y"]/10 * 2)/1000 *x for x in range(1000)]
         for i in thetas: #1000 points
@@ -138,31 +189,25 @@ class Cloud:
 
         return points
     
+    def center_cloud(self):
+        xs = [c["x"] for c in self.canvas]
+        ys = [c["y"] for c in self.canvas]
+        
+        x_min = min(xs)
+        x_max = max(xs) # ! not real max, real max need word width
+        
+        y_min = min(ys)
+        y_max = max(ys)
+        
+        shift_x = x_min - (self.canvas_size["x"] - (x_max - x_min))//2
+        shift_y = y_min - (self.canvas_size["y"] - (y_max - y_min))//2
+        
+        for c in self.canvas:
+            c["x"] -= shift_x
+            c["y"] -= shift_y
+        
+        
     '''
-    def choose_cluster_start(self):
-        start_points = {}
-        start_point = {}
-        r = 0
-        for i in range(len(self.clusters)):
-            c = self.clusters[i]
-            n = len(c)
-            
-            H = self.canvas_size["y"] #total height
-            L = self.canvas_size["x"] #total length
-            
-            if i%2 == 0:
-                y = random.randint(int(0.1*H), int(0.55*H))
-            else:
-                y = random.randint(int(0.55*H), int(0.9*H))
-            x = random.randint(int(r*L), min(int((r+len(c)/len(self.words))*L), int(L*0.90)))
-            
-            r = min(0.85, r + len(c)/len(self.words))
-            start_points[c[0].cluster] = {
-                "x": x,
-                "y": y
-            }
-        return start_points
-    
     def compress(self):
         # pull words towards the one zith the most occurence
         # create line 
@@ -188,3 +233,4 @@ class Cloud:
                         if self.verify_overlap(word, c):
                             break
     '''             
+
