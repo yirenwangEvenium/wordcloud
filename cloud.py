@@ -4,16 +4,20 @@ from math import sin
 
 
 class Cloud:
-    def __init__(self, words=[], canvas_size={"x": 1920, "y": 1080}, filename='clouds.html'):
+    def __init__(self, words=[], canvas_size={"x": 1920, "y": 1080}, filename='clouds.html', spiral_size = 10):
         self.words = words
+        self.spiral_size = spiral_size
         self.canvas = [] #{word, font_size, x, y, width, height, color, cluster} <== color to be added
         self.canvas_size = canvas_size
         self.clusters = self.generate_clusters() # {0 : cluster0, 1 : cluster1, ...etc}
         self.filename = filename
-        self.colors = ["#6F694E", "#65D0B2", "#D8F546", "#FF724B", "#D6523E", "#B3F0E6", "#EAF380", "#A7328E", "#33DB45", "#EAEA45", "#63FFF3", "#7488AC", "#C0F8E1"]
+        self.colors = ["#FE4747", "#FDA47C", "#FBD094", "#D9CC8F", "#A8B47D", "#AFE457", "#9C519B", "#EF93A4", "#BFBED9", "#F6C04E", "#FCEBC2", "#EDE574"]
         self.positions = []
         
     def generate_clusters(self):
+        '''
+        gather the words in the appropriate clusters
+        '''
         clusters = {}
         for w in self.words:
             if w.cluster in clusters:
@@ -21,8 +25,6 @@ class Cloud:
             else:
                 clusters[w.cluster] = [w]
         
-        for c, words in clusters.items():
-            print( [w.word for w in words])
         return clusters
     
     '''
@@ -118,6 +120,7 @@ class Cloud:
                     })
                     self.positions.remove(p)
                     return p
+                self.positions.remove(p)
             else:
                 if not self.verify_overlap( word, {"x": p["x"], "y": p["y"]} ):
                     self.canvas.append({
@@ -132,7 +135,7 @@ class Cloud:
                     })
                     self.positions.remove(p)
                     return p
-
+                self.positions.remove(p)
         return self.positions[-1]
             
 
@@ -182,7 +185,7 @@ class Cloud:
         # a_final = self.canvas_size["x"]*len(self.clusters[cluster])/len(self.words) #spiral radius 
         a_final = self.canvas_size["x"] #spiral radius 
 
-        b = (a_final - a_ini)/(2*3.14159*(self.canvas_size["x"]/10))
+        b = (a_final - a_ini)/(2*3.14159*(self.canvas_size["x"]/self.spiral_size))
 
         thetas = [ (self.canvas_size["y"]/10 * 2)/1000 *x for x in range(1000)]
         for i in thetas: #1000 points

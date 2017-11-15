@@ -135,7 +135,7 @@ def pre_processing(filename):
         for j in range(n):
             distance_matrix[i][j] = spatial.distance.cosine(glove_vectors[i], glove_vectors[j])
 
-    kw_fs = assign_font_size(propercase_freq, 80, 30) #keyword_font_size
+    kw_fs = assign_font_size(propercase_freq, 100, 28) #keyword_font_size
 
     kw_max_dim = max_dimensions(kw_fs)
 
