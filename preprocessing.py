@@ -104,28 +104,30 @@ def pre_processing(filename):
     glove_vectors = []
     labels_array = []
 
+    number_of_not_recignized_word = 0 
     for kw, count in propercase_freq.items():
         labels_array.append(kw)
         if nlp(kw)[0].vector.any() :
+            number_of_not_recignized_word += 1
             glove_vectors.append(nlp(kw)[0].vector)
         else: #word not found
             glove_vectors.append(np.array([0]*300))
 
+    # if the number over half the words are brand names finish with only one cluster 
+    if number_of_not_recignized_word > len(glove_vectors)//2:
+        kw_cluster = {}
+        for label in labels_array:
+            kw_cluster[label] = 0
+    else:
+        # AffinityPropagation clustering 
+        AffinityPropagation_model = AffinityPropagation()
+        AffinityPropagation_model.fit(glove_vectors)
 
-    # AffinityPropagation clustering 
-    AffinityPropagation_model = AffinityPropagation()
-    AffinityPropagation_model.fit(glove_vectors)
+        cluster_labels    = AffinityPropagation_model.labels_
 
-    cluster_labels    = AffinityPropagation_model.labels_
-
-    clusters = {}
-    kw_cluster = {}
-    for i in range(len(labels_array)):
-        if cluster_labels[i] not in clusters:
-            clusters[cluster_labels[i]] = [labels_array[i]]
-        else:
-            clusters[cluster_labels[i]].append(labels_array[i])
-        kw_cluster[labels_array[i]] = cluster_labels[i]
+        kw_cluster = {}
+        for i in range(len(labels_array)):
+            kw_cluster[labels_array[i]] = cluster_labels[i]
 
 
     #distance matrix (len(cluster_labels)^2)

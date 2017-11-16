@@ -4,8 +4,10 @@ from math import sin
 
 
 class Cloud:
-    def __init__(self, words=[], canvas_size={"x": 1920, "y": 1080}, filename='clouds.html', spiral_size = 10):
+    def __init__(self, words=[], canvas_size={"x": 1920, "y": 1080}, filename='clouds.html', spiral_size = 10, min_font_size=28, max_font_size=100):
         self.words = words
+        self.min_font_size = min_font_size
+        self.max_font_size = max_font_size
         self.spiral_size = spiral_size
         self.canvas = [] #{word, font_size, x, y, width, height, color, cluster} <== color to be added
         self.canvas_size = canvas_size
@@ -13,7 +15,12 @@ class Cloud:
         self.filename = filename
         self.colors = ["#FE4747", "#FDA47C", "#FBD094", "#D9CC8F", "#A8B47D", "#AFE457", "#9C519B", "#EF93A4", "#BFBED9", "#F6C04E", "#FCEBC2", "#EDE574"]
         self.positions = []
+
+    def color_selection(self, word, cluster, piority):
+        font_size = word.font_size
+        # there are 5 colours of the same gradient
         
+
     def generate_clusters(self):
         '''
         gather the words in the appropriate clusters
