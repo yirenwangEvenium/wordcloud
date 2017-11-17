@@ -3,17 +3,20 @@ import time
 
 from cloud import Cloud
 from preprocessing import pre_processing
-
+from colors import Colors
 
 # testing 
 for f in os.listdir('data'):
     start = time.time()
 
     words = pre_processing(f)
+    print([w.word for w in words])
     pre = time.time()
     pre_time = time.time() - start 
 
-    cloud = Cloud(words=words, filename='clouds/{}.html'.format(f.replace('.txt', '')), spiral_size=20)
+    color = Colors()
+
+    cloud = Cloud(words=words, color = color, filename='clouds/{}.html'.format(f.replace('.txt', '')), spiral_size=15)
     cloud.create_cloud()
     cloud.draw_cloud_to_svg()
 

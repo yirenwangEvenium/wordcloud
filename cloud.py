@@ -4,7 +4,8 @@ from math import sin
 
 
 class Cloud:
-    def __init__(self, words=[], canvas_size={"x": 1920, "y": 1080}, filename='clouds.html', spiral_size = 10, min_font_size=28, max_font_size=100):
+    def __init__(self, color, words=[] , canvas_size={"x": 1920, "y": 1080}, filename='clouds.html', spiral_size = 15, min_font_size=28, max_font_size=100):
+        self.color = color
         self.words = words
         self.min_font_size = min_font_size
         self.max_font_size = max_font_size
@@ -15,11 +16,7 @@ class Cloud:
         self.filename = filename
         self.colors = ["#FE4747", "#FDA47C", "#FBD094", "#D9CC8F", "#A8B47D", "#AFE457", "#9C519B", "#EF93A4", "#BFBED9", "#F6C04E", "#FCEBC2", "#EDE574"]
         self.positions = []
-
-    def color_selection(self, word, cluster, piority):
-        font_size = word.font_size
-        # there are 5 colours of the same gradient
-        
+        self.sorted_clusters = []
 
     def generate_clusters(self):
         '''
@@ -71,12 +68,12 @@ class Cloud:
             else:
                 avg_size = sum(sorted([w.font_size for w in words])[::-1][:4])/4
             cl_size[c] = avg_size*3 - len(words)
-        sorted_clusters = sorted(cl_size, key=cl_size.get)[::-1]
+        self.sorted_clusters = sorted(cl_size, key=cl_size.get)[::-1]
         
         start_position = { "x": self.canvas_size["x"]//2, "y": self.canvas_size["y"]//2 }
         
-        for i in range(len(sorted_clusters)):
-            c = sorted_clusters[i]
+        for i in range(len(self.sorted_clusters)):
+            c = self.sorted_clusters[i]
             words = self.clusters[c]
             self.positions = self.spiral(start_position)
             
@@ -112,6 +109,7 @@ class Cloud:
         
     def add_word_to_cloud(self, word): # word class Word
         center = {"x": self.canvas_size["x"] // 2, "y": self.canvas_size["y"] // 2}
+        last_position = self.positions[-1]
         for p in self.positions:
             if p["x"] < center["x"]:
                 if not self.verify_overlap( word, {"x": p["x"] - word.width, "y": p["y"]} ):
@@ -122,7 +120,7 @@ class Cloud:
                         "width": word.width,
                         "height": word.height,
                         "font_size": word.font_size,
-                        "color": self.colors[word.cluster],
+                        "color": self.color.choose_color(word.font_size, self.sorted_clusters.index(word.cluster)),
                         "cluster": word.cluster
                     })
                     self.positions.remove(p)
@@ -137,12 +135,14 @@ class Cloud:
                         "width": word.width,
                         "height": word.height,
                         "font_size": word.font_size,
-                        "color": self.colors[word.cluster],
+                        "color": self.color.choose_color(word.font_size, self.sorted_clusters.index(word.cluster)),
                         "cluster": word.cluster
                     })
                     self.positions.remove(p)
                     return p
                 self.positions.remove(p)
+        if len(self.positions) == 0:
+            return last_position
         return self.positions[-1]
             
 

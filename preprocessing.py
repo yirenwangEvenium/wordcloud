@@ -14,7 +14,7 @@ from word import Word
 
 # Remove stop words
 def stop_word_stripper(line):
-    stop_words = [w.strip('\n').lower() for w in open('data/stop_words.txt').readlines()]
+    stop_words = [w.strip('\n').lower() for w in open('stop_words.txt').readlines()]
     pos_stopper = ['PUNCT', 'SYM']
     return ' '.join([token.text for token in line if str(token).lower() not in stop_words and token.pos_  not in pos_stopper])
 
@@ -77,7 +77,7 @@ def pre_processing(filename):
     for token in corpus:
         if len(token.lemma_) >= MIN_CHARACTERS:
             word = token.lemma_
-            if word.lower == word:
+            if word.lower == word: #only spell check lower cased words
                 if not h.spell(token.lemma_):
                     if len(h.suggest(token.lemma_)) > 0:
                         word = h.suggest(token.lemma_)[0]
@@ -99,8 +99,7 @@ def pre_processing(filename):
     for kw, count in kw_freq.items():
         if count == max(caseless_freq[kw.lower()]):
             propercase_freq[kw] = sum(caseless_freq[kw.lower()])
-
-
+    
     glove_vectors = []
     labels_array = []
 
@@ -108,13 +107,13 @@ def pre_processing(filename):
     for kw, count in propercase_freq.items():
         labels_array.append(kw)
         if nlp(kw)[0].vector.any() :
-            number_of_not_recignized_word += 1
             glove_vectors.append(nlp(kw)[0].vector)
         else: #word not found
+            number_of_not_recignized_word += 1
             glove_vectors.append(np.array([0]*300))
 
     # if the number over half the words are brand names finish with only one cluster 
-    if number_of_not_recignized_word > len(glove_vectors)//2:
+    if number_of_not_recignized_word > len(glove_vectors)*0.5:
         kw_cluster = {}
         for label in labels_array:
             kw_cluster[label] = 0
