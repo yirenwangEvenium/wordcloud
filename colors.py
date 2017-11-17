@@ -4,7 +4,7 @@ class Colors:
     def __init__(self, min_font_size = 28, max_font_size=100):
         self.min_font_size = min_font_size
         self.max_font_size = max_font_size
-        self.base_colors = ["#FE4747", "#FDA47C", "#FBD094", "#D9CC8F", "#A8B47D", "#AFE457", "#9C519B", "#EF93A4", "#BFBED9", "#F6C04E", "#FCEBC2", "#EDE574"] #brightest to darkest TODO with this chart: http://www.december.com/html/spec/colorhslhex10.html
+        self.base_colors = ["#FE4747", "#FDA47C", "#FBD094", "#D9CC8F", "#A8B47D", "#AFE457", "#9C519B", "#EF93A4", "#BFBED9", "#F6C04E", "#FCEBC2", "#EDE574", "#EDE573", "#EDE524", "#EDF574"]
     
     def hex_to_rgb(self,value):
         """Return (red, green, blue) for the color given as #rrggbb."""
@@ -17,7 +17,10 @@ class Colors:
         return '#%02x%02x%02x' % (red, green, blue)
 
     def choose_color(self, font_size, cluster_priority):
-        base_color = self.base_colors[cluster_priority]
+        if cluster_priority < len(self.base_colors):
+            base_color = self.base_colors[cluster_priority]
+        else:
+            base_color = self.base_colors[-1]
         saturation = font_size/self.max_font_size
         rgb = self.hex_to_rgb(base_color)
         hsv = colorsys.rgb_to_hsv(rgb[0]/255, rgb[1]/255, rgb[2]/255)

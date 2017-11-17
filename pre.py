@@ -45,17 +45,16 @@ class PreProcessing():
         self.glove_vectors += new_vectors
         
         # check for brands type responses that deson't require clustering
-        if self.number_of_not_recignized_word > 0.5*len(self.words_freq):
+        if self.number_of_not_recignized_word > 0.3*len(self.words_freq):
             for w in self.words:
                 self.words_info[w]["cluster"] = 0
         if len(self.words_freq) < self.min_words_cluster:
-            print(1)
             self.create_clusters()
         else:
             # add a new word / entity to the cluster 
             # (if there are already plenty of words and well defined clusters)
             for i in range(len(self.words)):
-                self.words_info[self.words[i]]["cluster"] = self.cluster_model.predict(new_vectors[i])
+                self.words_info[self.words[i]]["cluster"] = self.cluster_model.predict([new_vectors[i]])[0]
 
 
         #empty out self.words for next round
@@ -109,9 +108,13 @@ class PreProcessing():
         ws = []
 
         for word in self.corpus.split(" "):
-            if not h.spell(word):
-                ws.append(h.suggest(word)[0]) # can be improved by double checking against existing words for better accuracy
-            ws.append(word)
+            if not h.spell(word) and word != "":
+                try: 
+                    ws.append(h.suggest(word)[0]) # can be improved by double checking against existing words for better accuracy
+                except:
+                    ws.append(word)
+            else:
+                ws.append(word)
         
         return ws
     
@@ -124,9 +127,11 @@ class PreProcessing():
 
     # create the clusters given words
     def create_clusters(self):
-        
+        if len(self.glove_vectors) == 1:
+            for w in self.words_info:
+                self.words_info[w]["cluster"] = 0
+
         self.cluster_model.fit(self.glove_vectors)
-        print(self.cluster_model.labels_)
         i = 0
         for w in self.words_info:
             self.words_info[w]["cluster"] = self.cluster_model.labels_[i] #[clusterNumber1, ... ] corresponds to [gloveVector1 ... ]
@@ -155,7 +160,3 @@ class PreProcessing():
             self.words_info[w]["size"] = (int(0.65*len(w)*info["font_size"]), info["font_size"]) #x, y (i.e. width, height)
 
 
-t = PreProcessing()
-words = t.add_word("cats god animals food baguette chilli rice")
-for w in words:
-    print(w.word, w.cluster, w.font_size)

@@ -14,7 +14,7 @@ class Cloud:
         self.canvas_size = canvas_size
         self.clusters = self.generate_clusters() # {0 : cluster0, 1 : cluster1, ...etc}
         self.filename = filename
-        self.colors = ["#FE4747", "#FDA47C", "#FBD094", "#D9CC8F", "#A8B47D", "#AFE457", "#9C519B", "#EF93A4", "#BFBED9", "#F6C04E", "#FCEBC2", "#EDE574"]
+        self.colors = ["#FE4747", "#FDA47C", "#FBD094", "#D9CC8F", "#A8B47D", "#AFE457", "#9C519B", "#EF93A4", "#BFBED9", "#F6C04E", "#FCEBC2", "#EDE574", "#EDE573", "#EDE524", "#EDF574", "#EDF574", "#EDF574", "#EDF574", "#EDF574", "#EDF574", "#EDF574"]
         self.positions = []
         self.sorted_clusters = []
 
@@ -194,12 +194,15 @@ class Cloud:
 
         b = (a_final - a_ini)/(2*3.14159*(self.canvas_size["x"]/self.spiral_size))
 
-        thetas = [ (self.canvas_size["y"]/10 * 2)/1000 *x for x in range(1000)]
+        thetas = [ (self.canvas_size["y"]/10 * 2)/1500 *x for x in range(1500)]
         for i in thetas: #1000 points
             x = ( a_ini + b*i + cos(i)*b/10)*cos(i) + start_point["x"]
             y = ( a_ini + b*i + cos(i)*b/10)*sin(i) + start_point["y"]
             points.append({"x": x, "y": y})
-
+        #REMOVE
+        if len(points) == 0:
+            print(self.filename)
+        #-->
         return points
     
     def center_cloud(self):

@@ -2,14 +2,17 @@ import os
 import time
 
 from cloud import Cloud
-from preprocessing import pre_processing
+from pre import PreProcessing
 from colors import Colors
 
 # testing 
 for f in os.listdir('data'):
     start = time.time()
 
-    words = pre_processing(f)
+    text = PreProcessing()
+
+    for line in [line.strip('\n') for line in open(os.path.join('data/', f)).readlines()]:
+        words = text.add_word(line)
     print([w.word for w in words])
     pre = time.time()
     pre_time = time.time() - start 
