@@ -1,0 +1,4 @@
+spacy
+cyhunspell
+sklearn
+scipy

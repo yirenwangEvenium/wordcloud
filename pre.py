@@ -38,6 +38,7 @@ class PreProcessing():
         self.get_freq() # result pushed in self.words_freq
         self.words_freq.update(self.entites_freq)
         self.assign_font_size() # results pushed in self.words_info
+        self.assign_width_height()
         #prepare clustering
         #calculate vectors of new word/words
         new_vectors = self.words_to_vec() # [vec0, ... ] corresponds to self.words [ w1, ... ]
@@ -48,6 +49,7 @@ class PreProcessing():
             for w in self.words:
                 self.words_info[w]["cluster"] = 0
         if len(self.words_freq) < self.min_words_cluster:
+            print(1)
             self.create_clusters()
         else:
             # add a new word / entity to the cluster 
@@ -55,8 +57,14 @@ class PreProcessing():
             for i in range(len(self.words)):
                 self.words_info[self.words[i]]["cluster"] = self.cluster_model.predict(new_vectors[i])
 
+
         #empty out self.words for next round
         self.words = []
+
+        words = [] 
+        for w, info in self.words_info.items():
+            words.append(Word(word = w, font_size=info["font_size"], size={"width": info["size"][0], "height": info["size"][1] }, cluster=info["cluster"]))
+        return words
         
 
 
@@ -118,7 +126,7 @@ class PreProcessing():
     def create_clusters(self):
         
         self.cluster_model.fit(self.glove_vectors)
-        
+        print(self.cluster_model.labels_)
         i = 0
         for w in self.words_info:
             self.words_info[w]["cluster"] = self.cluster_model.labels_[i] #[clusterNumber1, ... ] corresponds to [gloveVector1 ... ]
@@ -142,7 +150,12 @@ class PreProcessing():
             else:
                 self.words_info[kw] = { "font_size": size }
 
+    def assign_width_height(self):
+        for w, info in self.words_info.items():
+            self.words_info[w]["size"] = (int(0.65*len(w)*info["font_size"]), info["font_size"]) #x, y (i.e. width, height)
+
 
 t = PreProcessing()
-t.add_word("hello airplanes are going to leave soon from the airport. There are many airplanes")
-print(t.words_info)
+words = t.add_word("cats god animals food baguette chilli rice")
+for w in words:
+    print(w.word, w.cluster, w.font_size)
