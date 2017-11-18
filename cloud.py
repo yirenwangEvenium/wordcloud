@@ -78,7 +78,9 @@ class Cloud:
             self.positions = self.spiral(start_position)
             
             for w in words:
-                new_position = self.add_word_to_cloud(w) 
+                if len(self.positions) == 0:
+                    break
+                new_position = self.add_word_to_cloud(w, i%2 == 0) 
             
             max_left_cloud = min([c["x"] for c in self.canvas])
             max_right_cloud = max([c["x"] for c in self.canvas])
@@ -107,11 +109,11 @@ class Cloud:
         f.close()
         
         
-    def add_word_to_cloud(self, word): # word class Word
+    def add_word_to_cloud(self, word, moved): # word class Word
         center = {"x": self.canvas_size["x"] // 2, "y": self.canvas_size["y"] // 2}
         last_position = self.positions[-1]
         for p in self.positions:
-            if p["x"] < center["x"]:
+            if p["x"] < center["x"] and not moved:
                 if not self.verify_overlap( word, {"x": p["x"] - word.width, "y": p["y"]} ):
                     self.canvas.append({
                         "word": word.word,

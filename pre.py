@@ -8,14 +8,16 @@ import numpy as np
 from scipy import spatial
 from sklearn.cluster import KMeans
 from sklearn.cluster import AffinityPropagation
+from PIL import ImageFont, ImageDraw
 
 
 from word import Word
 
 class PreProcessing():
     #words are user input per line (e.g. keyword1)
-    def __init__(self, stop_words_file = 'stop_words.txt', max_font_size=100, min_font_size=28, min_characters=3, min_words_cluster=50):
+    def __init__(self, stop_words_file = 'stop_words.txt', max_font_size=100, min_font_size=28, min_characters=3, min_words_cluster=50, font="Verdana"):
         self.corpus = "" #raw data that need to be treated for individual submissions
+        self.font = font
         self.words = [] # words of each iteration
         self.stop_words = [w.strip('\n').lower() for w in open(stop_words_file).readlines()]
         self.max_font_size = max_font_size
@@ -157,6 +159,7 @@ class PreProcessing():
 
     def assign_width_height(self):
         for w, info in self.words_info.items():
-            self.words_info[w]["size"] = (int(0.65*len(w)*info["font_size"]), info["font_size"]) #x, y (i.e. width, height)
+            font = ImageFont.truetype(font=self.font, size=info["font_size"])
+            self.words_info[w]["size"] =  ImageFont.ImageFont.getsize(font, w)[0] #x, y (i.e. width, height)
 
 

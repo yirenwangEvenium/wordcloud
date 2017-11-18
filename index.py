@@ -5,6 +5,9 @@ from cloud import Cloud
 from pre import PreProcessing
 from colors import Colors
 
+
+color = Colors()
+
 # testing 
 for f in os.listdir('data'):
     start = time.time()
@@ -16,8 +19,6 @@ for f in os.listdir('data'):
     print([w.word for w in words])
     pre = time.time()
     pre_time = time.time() - start 
-
-    color = Colors()
 
     cloud = Cloud(words=words, color = color, filename='clouds/{}.html'.format(f.replace('.txt', '')), spiral_size=15)
     cloud.create_cloud()
