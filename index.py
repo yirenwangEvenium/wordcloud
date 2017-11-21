@@ -10,9 +10,12 @@ color = Colors()
 
 # testing 
 for f in os.listdir('data'):
-    start = time.time()
-
     text = PreProcessing()
+
+    #set font_sizes
+    text.set_font_size_to_size()
+    
+    start = time.time()
 
     for line in [line.strip('\n') for line in open(os.path.join('data/', f)).readlines()]:
         words = text.add_word(line)

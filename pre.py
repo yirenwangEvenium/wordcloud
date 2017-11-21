@@ -159,7 +159,12 @@ class PreProcessing():
 
     def assign_width_height(self):
         for w, info in self.words_info.items():
-            font = ImageFont.truetype(font=self.font, size=info["font_size"])
-            self.words_info[w]["size"] =  ImageFont.ImageFont.getsize(font, w)[0] #x, y (i.e. width, height)
+            font = self.fs_size[info["font_size"]]
+            self.words_info[w]["size"] = ImageFont.ImageFont.getsize(font, w)[0] #x, y (i.e. width, height)
 
 
+    def set_font_size_to_size(self):
+        self.fs_size = {}
+        for i in range(self.min_font_size - 1, self.max_font_size + 1):
+            font = ImageFont.truetype(font=self.font, size=i)
+            self.fs_size[i] = font

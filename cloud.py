@@ -17,7 +17,7 @@ class Cloud:
         self.colors = ["#FE4747", "#FDA47C", "#FBD094", "#D9CC8F", "#A8B47D", "#AFE457", "#9C519B", "#EF93A4", "#BFBED9", "#F6C04E", "#FCEBC2", "#EDE574", "#EDE573", "#EDE524", "#EDF574", "#EDF574", "#EDF574", "#EDF574", "#EDF574", "#EDF574", "#EDF574"]
         self.positions = []
         self.sorted_clusters = []
-
+        self.previously_check_fail = None
     def generate_clusters(self):
         '''
         gather the words in the appropriate clusters
@@ -149,21 +149,22 @@ class Cloud:
             
 
     def rect_intersection(self, r1, r2):
+        
         p1 = {}
-        p1["x"] = r1["x"]
-        p1["y"] = r1["y"] - r1["height"]
+        p1["x"] = r1["x"]*0.99
+        p1["y"] = (r1["y"] - r1["height"])*0.99
 
         p2 = {}
-        p2["x"] = r1["x"] + r1["width"]
-        p2["y"] = r1["y"]
+        p2["x"] = (r1["x"] + r1["width"])*1.01
+        p2["y"] = r1["y"]*1.01
 
         p3 = {}
-        p3["x"] = r2["x"]
-        p3["y"] = r2["y"] - r2["height"]
+        p3["x"] = r2["x"]*0.99
+        p3["y"] = (r2["y"] - r2["height"])*0.99
 
         p4 = {}
-        p4["x"] = r2["x"] + r2["width"]
-        p4["y"] = r2["y"]
+        p4["x"] = (r2["x"] + r2["width"])*1.01
+        p4["y"] = r2["y"]*1.01
 
         return not(p2["y"] < p3["y"] or p1["y"] > p4["y"] or p2["x"] < p3["x"] or p1["x"] > p4["x"])
 
@@ -175,11 +176,18 @@ class Cloud:
             "width": word.width,
             "height": word.height
         }
+
+        # check last failed position for faster iterations
+        if self.previously_check_fail is not None:
+            if self.rect_intersection(self.previously_check_fail, new_rect):
+                return True
+                
         for filled_rect in self.canvas:
             if self.rect_intersection(filled_rect, new_rect):
+                self.previously_check_fail = filled_rect
                 return True
         #verify out of bound of rectangle:
-        if new_rect["x"] < 0 or new_rect["x"] + new_rect["width"] > self.canvas_size["x"] or new_rect["y"] > 1080 or new_rect["y"]- new_rect["height"] < 0:
+        if new_rect["x"] < 10 or new_rect["x"] + new_rect["width"] > self.canvas_size["x"]*0.99 or new_rect["y"] > self.canvas_size["y"]*0.99 or new_rect["y"]- new_rect["height"] < 10:
             return True
         return False
     
