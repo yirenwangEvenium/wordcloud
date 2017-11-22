@@ -1,5 +1,5 @@
 import spacy
-nlp = spacy.load('en_core_web_md')
+nlp = spacy.load('en_core_web_md', parsed=False)
 
 from hunspell import Hunspell
 h = Hunspell()
@@ -15,7 +15,7 @@ from word import Word
 
 class PreProcessing():
     #words are user input per line (e.g. keyword1)
-    def __init__(self, stop_words_file = 'stop_words.txt', max_font_size=100, min_font_size=28, min_characters=3, min_words_cluster=50, font="Verdana"):
+    def __init__(self, stop_words_file = 'stop_words.txt', max_font_size=120, min_font_size=30, min_characters=3, min_words_cluster=300, font="Verdana"):
         self.corpus = "" #raw data that need to be treated for individual submissions
         self.font = font
         self.words = [] # words of each iteration
@@ -47,17 +47,16 @@ class PreProcessing():
         self.glove_vectors += new_vectors
         
         # check for brands type responses that deson't require clustering
-        if self.number_of_not_recignized_word > 0.3*len(self.words_freq):
+        if self.number_of_not_recignized_word + len(self.entites_freq) > 0.4*len(self.words_freq):
             for w in self.words:
-                self.words_info[w]["cluster"] = 0
+                self.words_info['{}{}'.format(w[0].upper(), w[1:].lower())]["cluster"] = 0
         if len(self.words_freq) < self.min_words_cluster:
             self.create_clusters()
         else:
             # add a new word / entity to the cluster 
             # (if there are already plenty of words and well defined clusters)
             for i in range(len(self.words)):
-                self.words_info[self.words[i]]["cluster"] = self.cluster_model.predict([new_vectors[i]])[0]
-
+                self.words_info['{}{}'.format(self.words[i][0].upper(), self.words[i][1:].lower())]["cluster"] = self.cluster_model.predict([new_vectors[i]])[0]
 
         #empty out self.words for next round
         self.words = []
@@ -68,36 +67,78 @@ class PreProcessing():
         return words
         
 
-
     def words_to_vec(self):
         glove_vectors = []
         for word in self.words:
-            if nlp(word)[0].vector.any() : #if is it an entity, only get the vector of first word ?
+            if nlp(word)[0].has_vector : #if is it an entity, only get the vector of first word ?
                 v = nlp(word)[0].vector
                 glove_vectors.append(v)
-                self.words_info[word]["vector"] = v
+                self.words_info['{}{}'.format(word[0].upper(), word[1:].lower())]["vector"] = v
             else: #word not found
                 self.number_of_not_recignized_word += 1
                 glove_vectors.append(np.array([0]*300))
-                self.words_info[word]["vector"] = np.array([0]*300)
+                self.words_info['{}{}'.format(word[0].upper(), word[1:].lower())]["vector"] = np.array([0]*300)
         return glove_vectors
     
     def get_entities(self, nlp_corpus):
         # check for entities
         for ent in nlp_corpus.ents:
-            self.corpus.replace(ent.text, "", 1)
-            self.words.append(ent.text)
-            if ent.text in self.entites_freq:
-                self.entites_freq[ent.text] += 1
-            else:
-                self.entites_freq[ent.text] = 1
+            if len(ent.text.split(' ')) > 1:
+                self.corpus.replace(ent.text, "", 1)
+                self.words.append(ent.text)
+                if ent.text in self.entites_freq:
+                    self.entites_freq[ent.text] += 1
+                else:
+                    self.entites_freq[ent.text] = 1
+
+    def check_in_words_info(self, w):
+        if len(self.words_info) == 0:
+            return False, None, None, None
+
+        for word in self.words_info:
+            # if new word exists within a word that already exists
+            if w.lower() in word.lower():
+                return True, word, None, None
+            
+            # if new word is a bigger version of one that already exists 
+            elif word.lower() in w.lower():
+                return False, w, self.words_freq[word] + 1, word
+            
+        return False, None, None, None
 
     def get_freq(self):
-        for w in self.words:
-            if w in self.words_info:
-                self.words_freq[w] += 1
+        for i in range(len(self.words)):
+            w = self.words[i]
+            exists, word, freq, prev_word = self.check_in_words_info('{}{}'.format(w[0].upper(), w[1:].lower()))
+            if exists:
+                # word that is already in dict updated to a higher freq
+                self.words = self.words[:i] + [word] + self.words[i+1:]
+                self.words_freq[word] += 1
+            elif word is not None :
+                # replace the word that is in the dict to new word with new freq
+                self.words = self.words[:i] + [word] + self.words[i+1:]
+                # replacement in words_freq
+                self.words_freq[word] = freq
+                del self.words_freq[prev_word]
+                # replacement in words info 
+                self.words_info[word] = self.words_info[prev_word]
+                del self.words_info[prev_word]
             else:
-                self.words_freq[w] = 1
+                self.words_freq['{}{}'.format(w[0].upper(), w[1:].lower())] = 1
+
+        '''
+        for entity, freq in self.entites_freq.items():
+            
+            w = entity
+            exists, word, freq1 = self.check_in_words_info('{}{}'.format(w[0].upper(), w[1:].lower()))
+            if exists:
+                self.words_freq[word] += 1
+            elif word is not None :
+                # replace the word in self.words
+                self.words_freq[word] = freq1 + freq - 1
+            else:
+                self.words_freq[w] = freq
+        '''
 
     # Remove stop words, remove words less than min_characters
     def remove_stopwords(self, words):
@@ -110,7 +151,8 @@ class PreProcessing():
         ws = []
 
         for word in self.corpus.split(" "):
-            if not h.spell(word) and word != "":
+            
+            if not h.spell(word) and word != "" and word.lower() == word:
                 try: 
                     ws.append(h.suggest(word)[0]) # can be improved by double checking against existing words for better accuracy
                 except:
@@ -146,16 +188,16 @@ class PreProcessing():
         min_count = sorted_tuples[-1][1]
         max_count = sorted_tuples[0][1]
         # sorted kw_fs in decreasing order of font_size
-        for kw, count in sorted_tuples:
+        for w, count in sorted_tuples:
             if (max_count - min_count) == 0:
                 size = int((self.max_font_size - self.min_font_size) / 2.0 + self.min_font_size)
             else:
                 #size = int(self.min_font_size + (self.max_font_size - self.min_font_size) * (count * 1.0 / (max_count - min_count)) ** 0.8)
                 size = int((self.max_font_size - self.min_font_size)/(max_count - min_count)*count + self.min_font_size - (self.max_font_size - self.min_font_size)/(max_count - min_count)*min_count)
-            if kw in self.words_info:
-                self.words_info[kw]["font_size"] = size
+            if '{}{}'.format(w[0].upper(), w[1:].lower()) in self.words_info:
+                self.words_info['{}{}'.format(w[0].upper(), w[1:].lower())]["font_size"] = size
             else:
-                self.words_info[kw] = { "font_size": size }
+                self.words_info['{}{}'.format(w[0].upper(), w[1:].lower())] = { "font_size": size }
 
     def assign_width_height(self):
         for w, info in self.words_info.items():

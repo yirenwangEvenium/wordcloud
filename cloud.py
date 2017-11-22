@@ -18,6 +18,7 @@ class Cloud:
         self.positions = []
         self.sorted_clusters = []
         self.previously_check_fail = None
+    
     def generate_clusters(self):
         '''
         gather the words in the appropriate clusters
@@ -209,10 +210,6 @@ class Cloud:
             x = ( a_ini + b*i + cos(i)*b/10)*cos(i) + start_point["x"]
             y = ( a_ini + b*i + cos(i)*b/10)*sin(i) + start_point["y"]
             points.append({"x": x, "y": y})
-        #REMOVE
-        if len(points) == 0:
-            print(self.filename)
-        #-->
         return points
     
     def center_cloud(self):

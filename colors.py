@@ -2,7 +2,7 @@ import colorsys
 import random 
 
 class Colors:
-    def __init__(self, min_font_size = 28, max_font_size=100):
+    def __init__(self, min_font_size = 30, max_font_size=120):
         self.min_font_size = min_font_size
         self.max_font_size = max_font_size
         self.base_colors = self.create_base_colours()
@@ -40,4 +40,3 @@ class Colors:
 
 
 c = Colors()
-print(c.base_colors)

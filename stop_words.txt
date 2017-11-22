@@ -173,3 +173,5 @@ isn't
 hadn't
 hasn't
 can't
+'s
+'t
