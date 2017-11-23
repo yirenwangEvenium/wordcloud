@@ -15,11 +15,12 @@ from word import Word
 
 class PreProcessing():
     #words are user input per line (e.g. keyword1)
-    def __init__(self, stop_words_file = 'stop_words.txt', max_font_size=120, min_font_size=30, min_characters=3, min_words_cluster=300, font="Verdana"):
+    def __init__(self, stop_words_file = 'stop_words.txt', negation_stop_words_file = 'negation_stop_words.txt', max_font_size=120, min_font_size=30, min_characters=3, min_words_cluster=300, font="Verdana"):
         self.corpus = "" #raw data that need to be treated for individual submissions
         self.font = font
         self.words = [] # words of each iteration
         self.stop_words = [w.strip('\n').lower() for w in open(stop_words_file).readlines()]
+        self.neg_stop_words = [w.strip('\n').lower() for w in open(negation_stop_words_file).readlines()]
         self.max_font_size = max_font_size
         self.min_font_size = min_font_size
         self.min_characters = min_characters
@@ -91,6 +92,16 @@ class PreProcessing():
                     self.entites_freq[ent.text] += 1
                 else:
                     self.entites_freq[ent.text] = 1
+
+        for token in nlp_corpus:
+            if len([t for t in token.lefts]) > 0:
+                left_token = [t.text for t in token.lefts][0]
+                if left_token in self.neg_stop_words :
+                    self.words.append(left_token + ' ' + token.text)
+                    if left_token + ' ' + token.text in  self.entites_freq:
+                        self.entites_freq[left_token + ' ' + token.text] += 1
+                    else:
+                        self.entites_freq[left_token + ' ' + token.text] = 1
 
     def check_in_words_info(self, w):
         if len(self.words_info) == 0:
@@ -182,7 +193,6 @@ class PreProcessing():
             self.cluster_model.fit(vectors)
             i = 0
             for w in self.words_info:
-                print(w, self.cluster_model.labels_[i])
                 self.words_info[w]["cluster"] = self.cluster_model.labels_[i] #[clusterNumber1, ... ] corresponds to [gloveVector1 ... ]
                 i += 1
     
