@@ -19,18 +19,24 @@ for f in os.listdir('data'):
     start = time.time()
 
     for line in [line.strip('\n') for line in open(os.path.join('data/', f)).readlines()]:
+        a = time.time()
         words = text.add_word(re.sub('[^0-9a-zA-Z -]+', ' ', line))
         #words = text.add_word(line)
 
-    pre = time.time()
-    pre_time = time.time() - start 
+        pre = time.time()
+        pre_time = time.time() - a 
 
-    print(text.entites_freq)
-    cloud = Cloud(words=words, color = color, filename='clouds/{}.html'.format(f.replace('.txt', '')), spiral_size=15)
-    cloud.create_cloud()
-    cloud.draw_cloud_to_svg()
+        cloud = Cloud(words=words, color = color, filename='clouds/{}.html'.format(f.replace('.txt', '')), spiral_size=15)
+        cloud.create_cloud()
 
-    
-    create_time = time.time() - pre 
-    total_time = time.time() - start 
-    print(f, pre_time, create_time, total_time)
+        pre_c = time.time()
+
+        for i in range(10):
+            cloud.compress()
+        cloud.draw_cloud_to_svg()
+
+        compress_time = time.time() - pre_c
+        
+        create_time = time.time() - pre 
+        total_time = time.time() - a 
+        print(f, "preprocesssing" , pre_time, "creation", create_time, "compress", compress_time, "total", total_time)

@@ -2,6 +2,7 @@ import random
 from math import cos
 from math import sin
 
+from word import Word
 
 class Cloud:
     def __init__(self, color, words=[] , canvas_size={"x": 1920, "y": 1080}, filename='clouds.html', spiral_size = 15, min_font_size=28, max_font_size=100):
@@ -10,7 +11,7 @@ class Cloud:
         self.min_font_size = min_font_size
         self.max_font_size = max_font_size
         self.spiral_size = spiral_size
-        self.canvas = [] #{word, font_size, x, y, width, height, color, cluster} <== color to be added
+        self.canvas = [] #{word, x, y, color} <== color to be added
         self.canvas_size = canvas_size
         self.clusters = self.generate_clusters() # {0 : cluster0, 1 : cluster1, ...etc}
         self.filename = filename
@@ -29,7 +30,6 @@ class Cloud:
                 clusters[w.cluster].append(w)
             else:
                 clusters[w.cluster] = [w]
-        
         return clusters
     
     '''
@@ -100,11 +100,9 @@ class Cloud:
         f = open(self.filename, 'w')
         f.write('<svg viewbox="0 0 {} {}" style="background: black">'.format(self.canvas_size["x"], self.canvas_size["y"]))
         for w in self.canvas:
-           
-
             #f.write(' <rect x="{}" y="{}" width="{}" height="{}"/>'.format( w["x"], w["y"], w["width"], w["height"]))
-            f.write('<text x="{}" y="{}" font-family="Verdana" font-size="{}" fill="{}">'.format(w["x"], w["y"], w["font_size"], w["color"]))
-            f.write(w["word"])
+            f.write('<text x="{}" y="{}" font-family="Verdana" font-size="{}" fill="{}">'.format(w["x"], w["y"], w["word"].font_size, w["color"]))
+            f.write(w["word"].word)
             f.write('</text>\n')
         f.write('</svg>')
         f.close()
@@ -117,14 +115,10 @@ class Cloud:
             if p["x"] < center["x"] and not moved:
                 if not self.verify_overlap( word, {"x": p["x"] - word.width, "y": p["y"]} ):
                     self.canvas.append({
-                        "word": word.word,
+                        "word": word,
                         "x": p["x"] - word.width,
                         "y": p["y"],
-                        "width": word.width,
-                        "height": word.height,
-                        "font_size": word.font_size,
                         "color": self.color.choose_color(word.font_size, self.sorted_clusters.index(word.cluster)),
-                        "cluster": word.cluster
                     })
                     self.positions.remove(p)
                     return p
@@ -132,14 +126,10 @@ class Cloud:
             else:
                 if not self.verify_overlap( word, {"x": p["x"], "y": p["y"]} ):
                     self.canvas.append({
-                        "word": word.word,
+                        "word": word,
                         "x": p["x"],
                         "y": p["y"],
-                        "width": word.width,
-                        "height": word.height,
-                        "font_size": word.font_size,
                         "color": self.color.choose_color(word.font_size, self.sorted_clusters.index(word.cluster)),
-                        "cluster": word.cluster
                     })
                     self.positions.remove(p)
                     return p
@@ -183,7 +173,13 @@ class Cloud:
             if self.rect_intersection(self.previously_check_fail, new_rect):
                 return True
                 
-        for filled_rect in self.canvas:
+        for obj in self.canvas:
+            filled_rect = {
+                "x": obj["x"],
+                "y": obj["y"],
+                "width": obj["word"].width,
+                "height": obj["word"].height
+            }
             if self.rect_intersection(filled_rect, new_rect):
                 self.previously_check_fail = filled_rect
                 return True
@@ -217,10 +213,10 @@ class Cloud:
         ys = [c["y"] for c in self.canvas]
         
         x_min = min(xs)
-        x_max = max(xs) + self.canvas[xs.index(max(xs))]["width"]
+        x_max = max(xs) + self.canvas[xs.index(max(xs))]["word"].width
         
         y_min = min(ys)
-        y_max = max(ys)
+        y_max = max(ys) + self.canvas[ys.index(max(ys))]["word"].height
         
         shift_x = x_min - (self.canvas_size["x"] - (x_max - x_min))//2
         shift_y = y_min - (self.canvas_size["y"] - (y_max - y_min))//2
@@ -228,8 +224,62 @@ class Cloud:
         for c in self.canvas:
             c["x"] -= shift_x
             c["y"] -= shift_y
-        
-        
+    
+
+    def compress(self):
+        # shift words towards the centre if possible
+        # one iteration only
+
+        for i in range(len(self.canvas)):
+            obj = self.canvas[i] 
+            # left side 
+            if obj["x"] < self.canvas_size["x"] // 2 : 
+                # shift to the right a number of pixels if possible
+                self.canvas[i] = {
+                    "word": obj["word"],
+                    "x": 0,
+                    "y": 0,
+                    "color": obj["color"],
+                }
+                if not self.verify_overlap(obj["word"], { "x": obj["x"] + 45, "y": obj["y"] } ):
+                    self.canvas[i] = {
+                        "word": obj["word"],
+                        "x": obj["x"] + 45,
+                        "y": obj["y"],
+                        "color": obj["color"],
+                    }
+                else:
+                    self.canvas[i] = {
+                        "word": obj["word"],
+                        "x": obj["x"],
+                        "y": obj["y"],
+                        "color": obj["color"],
+                    }
+
+            #right side
+            if obj["x"] > self.canvas_size["x"] // 2 : 
+                # shift to the right a number of pixels if possible
+                self.canvas[i] = {
+                    "word": obj["word"],
+                    "x": 0,
+                    "y": 0,
+                    "color": obj["color"],
+                }
+                if not self.verify_overlap(obj["word"], { "x": obj["x"] - 45, "y": obj["y"] } ):
+                    self.canvas[i] = {
+                        "word": obj["word"],
+                        "x": obj["x"] - 45,
+                        "y": obj["y"],
+                        "color": obj["color"],
+                    }
+                else:
+                    self.canvas[i] = {
+                        "word": obj["word"],
+                        "x": obj["x"],
+                        "y": obj["y"],
+                        "color": obj["color"],
+                    }
+
     '''
     def compress(self):
         # pull words towards the one zith the most occurence

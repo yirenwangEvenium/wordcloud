@@ -27,7 +27,6 @@ class PreProcessing():
         self.words_freq = {} # the dict with everything
         self.min_words_cluster = min_words_cluster
         self.number_of_not_recignized_word = 0
-        self.glove_vectors = []
         self.words_info = {} #info being cluster, font_size, dimensions #vectors
         self.cluster_model = AffinityPropagation()
 
@@ -37,21 +36,27 @@ class PreProcessing():
         self.get_entities(nlp_corpus) # result pushed in self.entites_freq
         self.corpus = self.remove_stopwords(nlp_corpus)
         self.lemmatize(self.spell_check()) # result pushed in self.words
+        if len(self.words) == 0:
+            words = [] 
+            for w, info in self.words_info.items():
+                words.append(Word(word = w, font_size=info["font_size"], size={"width": info["size"][0], "height": info["size"][1] }, cluster=info["cluster"]))
+            return words
         self.get_freq() # result pushed in self.words_freq
         self.words_freq.update(self.entites_freq)
         self.assign_font_size() # results pushed in self.words_info
         self.assign_width_height()
         #prepare clustering
         #calculate vectors of new word/words
-        new_vectors = self.words_to_vec() # [vec0, ... ] corresponds to self.words [ w1, ... ]
-        self.glove_vectors += new_vectors
+        self.words_to_vec() # [vec0, ... ] corresponds to self.words [ w1, ... ]
         
         # check for brands type responses that deson't require clustering
         if self.number_of_not_recignized_word + len(self.entites_freq) > 0.4*len(self.words_freq):
             for w in self.words:
                 self.words_info['{}{}'.format(w[0].upper(), w[1:].lower())]["cluster"] = 0
+
         if len(self.words_freq) < self.min_words_cluster:
             self.create_clusters()
+        
         else:
             # add a new word / entity to the cluster 
             # (if there are already plenty of words and well defined clusters)
@@ -68,17 +73,13 @@ class PreProcessing():
         
 
     def words_to_vec(self):
-        glove_vectors = []
         for word in self.words:
             if nlp(word)[0].has_vector : #if is it an entity, only get the vector of first word ?
                 v = nlp(word)[0].vector
-                glove_vectors.append(v)
                 self.words_info['{}{}'.format(word[0].upper(), word[1:].lower())]["vector"] = v
             else: #word not found
                 self.number_of_not_recignized_word += 1
-                glove_vectors.append(np.array([0]*300))
                 self.words_info['{}{}'.format(word[0].upper(), word[1:].lower())]["vector"] = np.array([0]*300)
-        return glove_vectors
     
     def get_entities(self, nlp_corpus):
         # check for entities
@@ -171,15 +172,19 @@ class PreProcessing():
 
     # create the clusters given words
     def create_clusters(self):
-        if len(self.glove_vectors) == 1:
+        if len(self.words_info) < 5:
             for w in self.words_info:
                 self.words_info[w]["cluster"] = 0
-
-        self.cluster_model.fit(self.glove_vectors)
-        i = 0
-        for w in self.words_info:
-            self.words_info[w]["cluster"] = self.cluster_model.labels_[i] #[clusterNumber1, ... ] corresponds to [gloveVector1 ... ]
-            i += 1
+        else:
+            vectors = []
+            for w, info in self.words_info.items():
+                vectors.append(info["vector"])
+            self.cluster_model.fit(vectors)
+            i = 0
+            for w in self.words_info:
+                print(w, self.cluster_model.labels_[i])
+                self.words_info[w]["cluster"] = self.cluster_model.labels_[i] #[clusterNumber1, ... ] corresponds to [gloveVector1 ... ]
+                i += 1
     
     
     # font size gets calculated each time

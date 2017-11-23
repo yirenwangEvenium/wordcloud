@@ -25,9 +25,10 @@ for f in os.listdir('data-test'):
     pre = time.time()
     pre_time = time.time() - start 
 
-    print(text.entites_freq)
     cloud = Cloud(words=words, color = color, filename='clouds/{}.html'.format(f.replace('.txt', '')), spiral_size=15)
     cloud.create_cloud()
+    for i in range(20):
+        cloud.compress()
     cloud.draw_cloud_to_svg()
 
     
