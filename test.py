@@ -27,6 +27,7 @@ for f in os.listdir('data-test'):
 
     cloud = Cloud(words=words, color = color, filename='clouds/{}.html'.format(f.replace('.txt', '')), spiral_size=15)
     cloud.create_cloud()
+    #text.create_force_cloud()
     for i in range(20):
         cloud.compress()
     cloud.draw_cloud_to_svg()

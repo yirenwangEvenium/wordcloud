@@ -57,7 +57,8 @@ class Cloud:
             }
         return start_points
     '''
-        
+
+
     def create_cloud(self):
         
         # sort by cluster size
@@ -100,7 +101,7 @@ class Cloud:
         f = open(self.filename, 'w')
         f.write('<svg viewbox="0 0 {} {}" style="background: black">'.format(self.canvas_size["x"], self.canvas_size["y"]))
         for w in self.canvas:
-            #f.write(' <rect x="{}" y="{}" width="{}" height="{}"/>'.format( w["x"], w["y"], w["width"], w["height"]))
+            #f.write(' <rect x="{}" y="{}" width="{}" height="{}"/>'.format( w["x"], w["y"], w["word"].width, w["word"].height))
             f.write('<text x="{}" y="{}" font-family="Verdana" font-size="{}" fill="{}">'.format(w["x"], w["y"], w["word"].font_size, w["color"]))
             f.write(w["word"].word)
             f.write('</text>\n')
@@ -155,7 +156,7 @@ class Cloud:
 
         p4 = {}
         p4["x"] = (r2["x"] + r2["width"])*1.01
-        p4["y"] = r2["y"]*1.01
+        p4["y"] = r2["y"]*1.02
 
         return not(p2["y"] < p3["y"] or p1["y"] > p4["y"] or p2["x"] < p3["x"] or p1["x"] > p4["x"])
 
@@ -184,7 +185,7 @@ class Cloud:
                 self.previously_check_fail = filled_rect
                 return True
         #verify out of bound of rectangle:
-        if new_rect["x"] < 10 or new_rect["x"] + new_rect["width"] > self.canvas_size["x"]*0.99 or new_rect["y"] > self.canvas_size["y"]*0.99 or new_rect["y"]- new_rect["height"] < 10:
+        if new_rect["x"] < 10 or new_rect["x"] + new_rect["width"] > self.canvas_size["x"]*0.99 or new_rect["y"] + new_rect["height"] > self.canvas_size["y"]*0.99 or new_rect["y"] < 10:
             return True
         return False
     

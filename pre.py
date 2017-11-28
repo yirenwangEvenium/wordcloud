@@ -10,13 +10,17 @@ from sklearn.cluster import KMeans
 from sklearn.cluster import AffinityPropagation
 from PIL import ImageFont, ImageDraw
 
+import networkx as nx
+from fa2 import ForceAtlas2
+import matplotlib.pyplot as plt
+
 
 from word import Word
 
 class PreProcessing():
     #words are user input per line (e.g. keyword1)
     def __init__(self, stop_words_file = 'stop_words.txt', negation_stop_words_file = 'negation_stop_words.txt', max_font_size=120, min_font_size=30, min_characters=3, min_words_cluster=300, font="Verdana"):
-        self.corpus = "" #raw data that need to be treated for individual submissions
+        self.corpus = [] #raw data that need to be treated for individual submissions
         self.font = font
         self.words = [] # words of each iteration
         self.stop_words = [w.strip('\n').lower() for w in open(stop_words_file).readlines()]
@@ -33,9 +37,9 @@ class PreProcessing():
 
     def add_word(self, words):
         self.corpus = words
-        nlp_corpus = nlp(self.corpus)
+        nlp_corpus = nlp(words) 
         self.get_entities(nlp_corpus) # result pushed in self.entites_freq
-        self.corpus = self.remove_stopwords(nlp_corpus)
+        self.corpus = self.remove_stopwords(nlp(self.corpus))
         self.lemmatize(self.spell_check()) # result pushed in self.words
         if len(self.words) == 0:
             words = [] 
@@ -74,7 +78,7 @@ class PreProcessing():
         
 
     def words_to_vec(self):
-        for word in self.words:
+        for word in self.words_info:
             if nlp(word)[0].has_vector : #if is it an entity, only get the vector of first word ?
                 v = nlp(word)[0].vector
                 self.words_info['{}{}'.format(word[0].upper(), word[1:].lower())]["vector"] = v
@@ -86,7 +90,9 @@ class PreProcessing():
         # check for entities
         for ent in nlp_corpus.ents:
             if len(ent.text.split(' ')) > 1:
-                self.corpus.replace(ent.text, "", 1)
+                print(self.corpus, ent.text)
+                self.corpus=self.corpus.replace(ent.text, "", 1)
+                print(self.corpus)
                 self.words.append(ent.text)
                 if ent.text in self.entites_freq:
                     self.entites_freq[ent.text] += 1
@@ -98,10 +104,32 @@ class PreProcessing():
                 left_token = [t.text for t in token.lefts][0]
                 if left_token in self.neg_stop_words :
                     self.words.append(left_token + ' ' + token.text)
+                    self.corpus = self.corpus.replace(left_token + ' ' + token.text, '', 1)
                     if left_token + ' ' + token.text in  self.entites_freq:
                         self.entites_freq[left_token + ' ' + token.text] += 1
                     else:
                         self.entites_freq[left_token + ' ' + token.text] = 1
+        #bi grams 
+        #count pairs of words 
+        self.bi_freq = {}
+        new_pairs = []
+        words = self.corpus.split(' ')
+        for i in range(len( words ) - 1):
+            bi_w = words[i] + ' ' + words[i+1]
+            new_pairs.append(bi_w)
+            if bi_w in self.bi_freq:
+                self.bi_freq[bi_w] += 1
+            else:
+                self.bi_freq[bi_w] = 1
+
+        for bi_w, f in self.bi_freq.items():
+            if f >= 2 and bi_w in new_pairs:
+                self.corpus = self.corpus.replace(bi_w, '', 1)
+                if bi_w in self.entites_freq:
+                    self.entites_freq[bi_w] += 1
+                else:
+                    self.entites_freq[bi_w] = 1
+            
 
     def check_in_words_info(self, w):
         if len(self.words_info) == 0:
@@ -217,11 +245,64 @@ class PreProcessing():
     def assign_width_height(self):
         for w, info in self.words_info.items():
             font = self.fs_size[info["font_size"]]
-            self.words_info[w]["size"] = ImageFont.ImageFont.getsize(font, w)[0] #x, y (i.e. width, height)
-
-
+            self.words_info[w]["size"] = (ImageFont.ImageFont.getsize(font, w)[0][0], ImageFont.ImageFont.getsize(font, w)[0][1]) #x, y (i.e. width, height)
+            for i in w.lower()[1:]:
+                if i in ['p', 'g', 'j', 'q', 'y', 'z']:
+                    self.words_info[w]["size"] = (ImageFont.ImageFont.getsize(font, w)[0][0], ImageFont.ImageFont.getsize(font, w)[0][1]*1.2) #x, y (i.e. width, height)
+                    break
+            
     def set_font_size_to_size(self):
         self.fs_size = {}
         for i in range(self.min_font_size - 1, self.max_font_size + 1):
             font = ImageFont.truetype(font=self.font, size=i)
             self.fs_size[i] = font
+
+    def create_force_cloud(self):
+        G = nx.Graph()
+
+        for w, info in self.words_info.items():
+            for w1, info1 in self.words_info.items():
+                if w != w1:
+                    if not G.has_edge(w, w1):
+                        if info["cluster"] == info1["cluster"]:
+                            weight = 5 - spatial.distance.cosine(info["vector"], info1["vector"]) + 5
+                            if weight == weight:
+                                G.add_edge(w, w1, weight=weight)
+                            else:
+                                G.add_edge(w, w1, weight=0.1)
+                        else:
+                            weight = 5 - spatial.distance.cosine(info["vector"], info1["vector"])
+                            if weight == weight:
+                                G.add_edge(w, w1, weight=weight)
+                            else:
+                                G.add_edge(w, w1, weight=0.1)
+
+        forceatlas2 = ForceAtlas2(
+                        # Behavior alternatives
+                        outboundAttractionDistribution=True,  # Dissuade hubs
+                        linLogMode=False,  # NOT IMPLEMENTED
+                        adjustSizes=False,  # Prevent overlap (NOT IMPLEMENTED)
+                        edgeWeightInfluence=1.0,
+
+                        # Performance
+                        jitterTolerance=1.0,  # Tolerance
+                        barnesHutOptimize=True,
+                        barnesHutTheta=1.2,
+                        multiThreaded=False,  # NOT IMPLEMENTED
+
+                        # Tuning
+                        scalingRatio=2.0,
+                        strongGravityMode=False,
+                        gravity=1.0,
+
+                        # Log
+                        verbose=True)
+        positions = {}
+        for p, pos in forceatlas2.forceatlas2_networkx_layout(G, pos=None, iterations=100).items():
+            positions[p] = (min(pos[0], 10000), min(pos[1], 10000) )
+            print(pos)
+        
+        edgelist=[]
+
+        nx.draw_networkx(G, positions, edgelist=edgelist, cmap=plt.get_cmap('jet'), node_size=50, with_labels=True, vmin=0.,vmax=0.6)
+        plt.show()
